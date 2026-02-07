@@ -4,10 +4,6 @@
   "installCommand": "npm install",
   "framework": "nextjs",
   "outputDirectory": ".next",
-  "env": {
-    "NEXT_PUBLIC_API_URL": "@next_public_api_url",
-    "AUTH_SERVER_BACKEND_URL": "@auth_server_backend_url"
-  },
   "regions": ["sfo1"],
   "functions": {
     "api/**/*.ts": {
