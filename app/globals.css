@@ -95,6 +95,11 @@ textarea:focus {
   color: var(--text);
 }
 
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -183,6 +188,14 @@ textarea:focus {
   display: flex;
   gap: 8px;
   margin-top: 8px;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 14px;
 }
 
 .btn-sm {
