@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import CarForm from '../components/CarForm';
 import CarTable from '../components/CarTable';
 
@@ -14,10 +14,56 @@ type Car = {
   disponibilidade?: boolean;
 };
 
+const PAGE_SIZE = 10;
+const SORT_BY = 'id';
+const DIRECTION = 'asc';
+
 export default function Page() {
   const [cars, setCars] = useState<Car[]>([]);
   const [loading, setLoading] = useState(false);
   const [editingCar, setEditingCar] = useState<Car | null>(null);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+
+  const load = useCallback(async (targetPage: number) => {
+    setLoading(true);
+    try {
+      const API = process.env.NEXT_PUBLIC_API_URL ?? '';
+      const params = new URLSearchParams({
+        page: String(targetPage),
+        size: String(PAGE_SIZE),
+        sortBy: SORT_BY,
+        direction: DIRECTION,
+      });
+
+      const res = await fetch(`${API}/car/paginado?${params.toString()}`);
+      if (res.ok) {
+        const ct = res.headers.get('content-type') || '';
+        if (ct.includes('application/json')) {
+          const data = await res.json();
+          setCars(data?.content || []);
+          setPage(data?.number ?? targetPage);
+          setTotalPages(data?.totalPages ?? 0);
+        } else {
+          const text = await res.text();
+          console.error('Resposta inesperada (não-JSON):', text);
+          alert('Resposta inesperada do servidor. Verifique NEXT_PUBLIC_API_URL.');
+        }
+      } else {
+        const text = await res.text();
+        console.error('Falha ao buscar:', res.status, text);
+        alert('Falha ao buscar carros. Verifique o servidor.');
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load(page);
+  }, [load, page]);
 
   const handleDelete = async (carId: number) => {
     if (!confirm('Tem certeza que deseja deletar este carro?')) return;
@@ -27,7 +73,13 @@ export default function Page() {
       if (!res.ok) {
         throw new Error(`Erro ao deletar: ${res.status}`);
       }
-      load();
+
+      if (cars.length === 1 && page > 0) {
+        setPage((prev) => prev - 1);
+      } else {
+        load(page);
+      }
+
       alert('Carro deletado com sucesso!');
     } catch (err) {
       console.error(err);
@@ -44,36 +96,17 @@ export default function Page() {
     setEditingCar(null);
   };
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const API = process.env.NEXT_PUBLIC_API_URL ?? '';
-      const res = await fetch(`${API}/car`);
-      if (res.ok) {
-        const ct = res.headers.get('content-type') || '';
-        if (ct.includes('application/json')) {
-          const data = await res.json();
-          setCars(data || []);
-        } else {
-          const text = await res.text();
-          console.error('Resposta inesperada (não-JSON):', text);
-          alert('Resposta inesperada do servidor. Verifique NEXT_PUBLIC_API_URL.');
-        }
-      } else {
-        const text = await res.text();
-        console.error('Falha ao buscar:', res.status, text);
-        alert('Falha ao buscar carros. Verifique o servidor.');
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
+  const handleNextPage = () => {
+    if (page < totalPages - 1) {
+      setPage((prev) => prev + 1);
     }
   };
 
-  useEffect(() => {
-    load();
-  }, []);
+  const handlePreviousPage = () => {
+    if (page > 0) {
+      setPage((prev) => prev - 1);
+    }
+  };
 
   const handleDownload = async () => {
     try {
@@ -121,7 +154,7 @@ export default function Page() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 18 }}>
         <h1 style={{ margin: 0 }}>Gerenciador de Carros</h1>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className='btn btn-ghost' onClick={load}>
+          <button className='btn btn-ghost' onClick={() => load(page)}>
             {loading ? 'Carregando...' : 'Atualizar'}
           </button>
           <button className='btn btn-accent' onClick={handleDownload}>
@@ -132,11 +165,22 @@ export default function Page() {
 
       <div className='two-col'>
         <div>
-          <CarForm onSuccess={() => { load(); clearEdit(); }} editingCar={editingCar} onCancelEdit={clearEdit} />
+          <CarForm onSuccess={() => { load(page); clearEdit(); }} editingCar={editingCar} onCancelEdit={clearEdit} />
         </div>
         <div>
           <h2 style={{ margin: '0 0 12px 0' }}>Carros Cadastrados</h2>
           <CarTable cars={cars} onEdit={handleEdit} onDelete={handleDelete} />
+          <div className='pagination-controls'>
+            <button className='btn btn-ghost btn-sm' onClick={handlePreviousPage} disabled={loading || page === 0}>
+              ← Anterior
+            </button>
+            <span style={{ color: 'var(--muted)', fontSize: 13 }}>
+              Página {totalPages === 0 ? 0 : page + 1} de {totalPages}
+            </span>
+            <button className='btn btn-ghost btn-sm' onClick={handleNextPage} disabled={loading || page >= totalPages - 1}>
+              Próxima →
+            </button>
+          </div>
         </div>
       </div>
     </div>
